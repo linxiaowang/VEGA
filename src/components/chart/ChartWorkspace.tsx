@@ -121,17 +121,18 @@ export function ChartWorkspace({
   }
 
   return (
-    <div className="mx-auto grid min-h-[calc(100vh-3.5rem)] max-w-[1600px] grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)_260px]">
-      <aside className="border-b border-[var(--border)] bg-[var(--panel)] lg:border-b-0 lg:border-r">
-        <div className="border-b border-[var(--border)] px-4 py-3">
+    <div className="mx-auto grid min-h-[calc(100dvh-3.5rem)] max-w-[1600px] grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)_260px]">
+      {/* 移动端：图表优先；桌面：左 Watchlist */}
+      <aside className="order-3 border-t border-[var(--border)] bg-[var(--panel)] lg:order-1 lg:border-r lg:border-t-0">
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-3 py-3 sm:px-4">
           <p className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--muted)]">
             Watchlist
           </p>
-          <div className="mt-2 inline-flex rounded-lg border border-[var(--border)] p-0.5">
+          <div className="inline-flex rounded-lg border border-[var(--border)] p-0.5">
             <Link
               href="/chart/crypto/BTCUSDT"
               className={cn(
-                "rounded-md px-2.5 py-1 text-xs",
+                "rounded-md px-2.5 py-1.5 text-xs sm:py-1",
                 market === "crypto"
                   ? "bg-[var(--panel-2)] text-[var(--text)]"
                   : "text-[var(--muted)]",
@@ -142,7 +143,7 @@ export function ChartWorkspace({
             <Link
               href="/chart/stock/AAPL"
               className={cn(
-                "rounded-md px-2.5 py-1 text-xs",
+                "rounded-md px-2.5 py-1.5 text-xs sm:py-1",
                 market === "stock"
                   ? "bg-[var(--panel-2)] text-[var(--text)]"
                   : "text-[var(--muted)]",
@@ -152,7 +153,9 @@ export function ChartWorkspace({
             </Link>
           </div>
         </div>
-        <div className="max-h-[280px] overflow-auto lg:max-h-[calc(100vh-8rem)]">
+
+        {/* 手机：横向滑动；桌面：纵向列表 */}
+        <div className="flex gap-2 overflow-x-auto px-3 py-3 lg:block lg:max-h-[calc(100vh-8rem)] lg:space-y-0 lg:overflow-auto lg:px-0 lg:py-0">
           {watchlist.map((item) => {
             const itemUp = item.changePercent >= 0;
             const active = item.symbol === symbol;
@@ -161,25 +164,27 @@ export function ChartWorkspace({
                 key={item.symbol}
                 href={`/chart/${item.market}/${encodeURIComponent(item.symbol)}`}
                 className={cn(
-                  "flex items-center justify-between gap-2 border-b border-[var(--border)] px-4 py-2.5 transition",
-                  active ? "bg-[var(--panel-2)]" : "hover:bg-[var(--panel-2)]/70",
+                  "flex min-w-[9.5rem] shrink-0 flex-col justify-between rounded-xl border px-3 py-2.5 transition lg:min-w-0 lg:flex-row lg:items-center lg:rounded-none lg:border-0 lg:border-b lg:border-[var(--border)] lg:px-4",
+                  active
+                    ? "border-[var(--accent)] bg-[var(--panel-2)]"
+                    : "border-[var(--border)] bg-[var(--bg)] lg:bg-transparent lg:hover:bg-[var(--panel-2)]/70",
                 )}
               >
-                <span>
-                  <span className="block font-[family-name:var(--font-mono)] text-sm text-[var(--text)]">
+                <span className="min-w-0">
+                  <span className="block truncate font-[family-name:var(--font-mono)] text-sm text-[var(--text)]">
                     {item.symbol}
                   </span>
                   <span className="block max-w-[110px] truncate text-[11px] text-[var(--muted)]">
                     {item.name}
                   </span>
                 </span>
-                <span className="text-right">
-                  <span className="block font-[family-name:var(--font-mono)] text-xs text-[var(--text)]">
+                <span className="mt-2 text-left lg:mt-0 lg:text-right">
+                  <span className="block font-[family-name:var(--font-mono)] text-xs tabular-nums text-[var(--text)]">
                     {formatPrice(item.price, item.market)}
                   </span>
                   <span
                     className={cn(
-                      "block font-[family-name:var(--font-mono)] text-[11px]",
+                      "block font-[family-name:var(--font-mono)] text-[11px] tabular-nums",
                       itemUp ? "text-[var(--up)]" : "text-[var(--down)]",
                     )}
                   >
@@ -192,11 +197,11 @@ export function ChartWorkspace({
         </div>
       </aside>
 
-      <section className="flex min-w-0 flex-col bg-[var(--bg)]">
-        <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[var(--border)] px-4 py-4 sm:px-5">
-          <div>
+      <section className="order-1 flex min-w-0 flex-col bg-[var(--bg)] lg:order-2">
+        <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] px-3 py-3 sm:items-end sm:gap-4 sm:px-5 sm:py-4">
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight text-[var(--text)]">
+              <h1 className="truncate font-[family-name:var(--font-display)] text-xl font-semibold tracking-tight text-[var(--text)] sm:text-2xl">
                 {symbol}
               </h1>
               <span
@@ -210,15 +215,15 @@ export function ChartWorkspace({
                 {market}
               </span>
             </div>
-            <p className="mt-1 text-sm text-[var(--muted)]">{quote?.name ?? "—"}</p>
+            <p className="mt-1 truncate text-sm text-[var(--muted)]">{quote?.name ?? "—"}</p>
           </div>
-          <div className="text-right">
-            <div className="font-[family-name:var(--font-mono)] text-3xl text-[var(--text)]">
+          <div className="shrink-0 text-right">
+            <div className="font-[family-name:var(--font-mono)] text-2xl tabular-nums text-[var(--text)] sm:text-3xl">
               {formatPrice(quote?.price ?? 0, market)}
             </div>
             <div
               className={cn(
-                "mt-1 font-[family-name:var(--font-mono)] text-sm",
+                "mt-1 font-[family-name:var(--font-mono)] text-xs tabular-nums sm:text-sm",
                 up ? "text-[var(--up)]" : "text-[var(--down)]",
               )}
             >
@@ -227,15 +232,15 @@ export function ChartWorkspace({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] px-4 py-3 sm:px-5">
-          <div className="flex flex-wrap gap-1">
+        <div className="border-b border-[var(--border)] px-3 py-2.5 sm:px-5 sm:py-3">
+          <div className="-mx-3 flex gap-1 overflow-x-auto px-3 pb-2 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
             {TIMEFRAMES.map((item) => (
               <button
                 key={item}
                 type="button"
                 onClick={() => setTimeframe(item)}
                 className={cn(
-                  "rounded-md px-2.5 py-1 font-[family-name:var(--font-mono)] text-xs transition",
+                  "shrink-0 rounded-md px-3 py-1.5 font-[family-name:var(--font-mono)] text-xs transition sm:px-2.5 sm:py-1",
                   timeframe === item
                     ? "bg-[var(--accent)] text-[var(--bg)]"
                     : "bg-[var(--panel)] text-[var(--muted)] hover:text-[var(--text)]",
@@ -245,8 +250,7 @@ export function ChartWorkspace({
               </button>
             ))}
           </div>
-          <div className="mx-1 hidden h-5 w-px bg-[var(--border)] sm:block" />
-          <div className="flex flex-wrap gap-1">
+          <div className="-mx-3 mt-1 flex gap-1 overflow-x-auto px-3 sm:mx-0 sm:mt-2 sm:flex-wrap sm:overflow-visible sm:px-0">
             {INDICATORS.map((item) => {
               const active = indicators.includes(item.key);
               return (
@@ -255,7 +259,7 @@ export function ChartWorkspace({
                   type="button"
                   onClick={() => toggleIndicator(item.key)}
                   className={cn(
-                    "rounded-md border px-2.5 py-1 text-xs transition",
+                    "shrink-0 rounded-md border px-3 py-1.5 text-xs transition sm:px-2.5 sm:py-1",
                     active
                       ? "border-[var(--accent)] text-[var(--accent)]"
                       : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)]",
@@ -268,9 +272,9 @@ export function ChartWorkspace({
           </div>
         </div>
 
-        <div className="relative min-h-[460px] flex-1 p-2 sm:p-3">
+        <div className="relative min-h-[52vh] flex-1 p-1 sm:min-h-[460px] sm:p-3">
           {error && (
-            <div className="absolute inset-x-4 top-4 z-10 rounded-xl border border-[color-mix(in_oklab,var(--down)_40%,var(--border))] bg-[color-mix(in_oklab,var(--down)_12%,var(--panel))] px-4 py-3 text-sm text-[var(--down)]">
+            <div className="absolute inset-x-3 top-3 z-10 rounded-xl border border-[color-mix(in_oklab,var(--down)_40%,var(--border))] bg-[color-mix(in_oklab,var(--down)_12%,var(--panel))] px-3 py-2.5 text-sm text-[var(--down)] sm:inset-x-4 sm:top-4 sm:px-4 sm:py-3">
               {error}
             </div>
           )}
@@ -282,25 +286,25 @@ export function ChartWorkspace({
         </div>
       </section>
 
-      <aside className="border-t border-[var(--border)] bg-[var(--panel)] lg:border-l lg:border-t-0">
-        <div className="border-b border-[var(--border)] px-4 py-3">
+      <aside className="order-2 border-t border-[var(--border)] bg-[var(--panel)] lg:order-3 lg:border-l lg:border-t-0">
+        <div className="border-b border-[var(--border)] px-3 py-3 sm:px-4">
           <p className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--muted)]">
             Details
           </p>
         </div>
-        <div className="space-y-3 p-4">
+        <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-1 sm:gap-3 sm:p-4">
           {stats.map((item) => (
             <div
               key={item.label}
-              className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--panel-2)]/50 px-3 py-2.5"
+              className="flex flex-col gap-1 rounded-xl border border-[var(--border)] bg-[var(--panel-2)]/50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
             >
-              <span className="text-xs text-[var(--muted)]">{item.label}</span>
-              <span className="font-[family-name:var(--font-mono)] text-sm text-[var(--text)]">
+              <span className="text-[11px] text-[var(--muted)] sm:text-xs">{item.label}</span>
+              <span className="font-[family-name:var(--font-mono)] text-sm tabular-nums text-[var(--text)]">
                 {item.value}
               </span>
             </div>
           ))}
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] p-3 text-xs leading-relaxed text-[var(--muted)]">
+          <div className="col-span-2 rounded-xl border border-[var(--border)] bg-[var(--bg)] p-3 text-[11px] leading-relaxed text-[var(--muted)] sm:col-span-1 sm:text-xs">
             数据来源：币安公开行情
             {market === "crypto"
               ? "（USDT 永续/现货）"
@@ -315,7 +319,7 @@ export function ChartWorkspace({
 
 function ChartSkeleton() {
   return (
-    <div className="flex h-full min-h-[420px] items-center justify-center rounded-xl border border-dashed border-[var(--border)] bg-[var(--panel)]/40">
+    <div className="flex h-full min-h-[52vh] items-center justify-center rounded-xl border border-dashed border-[var(--border)] bg-[var(--panel)]/40 sm:min-h-[420px]">
       <div className="text-center">
         <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-[var(--border)] border-t-[var(--accent)]" />
         <p className="text-sm text-[var(--muted)]">加载 K 线…</p>

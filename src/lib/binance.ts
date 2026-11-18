@@ -1,3 +1,4 @@
+import { fuzzyMatchAny, matchScore } from "./search";
 import { isStockPairSymbol, resolveStockInstrument, STOCK_INSTRUMENTS } from "./stocks";
 import type { Candle, MarketKind, SearchResult, Ticker, Timeframe } from "./types";
 
@@ -54,6 +55,25 @@ const CRYPTO_NAMES: Record<string, string> = {
   DOTUSDT: "Polkadot",
   LTCUSDT: "Litecoin",
   ATOMUSDT: "Cosmos",
+};
+
+const CRYPTO_ALIASES: Record<string, string[]> = {
+  BTCUSDT: ["bitcoin", "btc", "比特币"],
+  ETHUSDT: ["ethereum", "eth", "以太坊", "以太"],
+  BNBUSDT: ["bnb", "币安币"],
+  SOLUSDT: ["solana", "sol", "索拉纳"],
+  DOGEUSDT: ["dogecoin", "doge", "狗狗币"],
+};
+
+const STOCK_ALIASES: Record<string, string[]> = {
+  AAPL: ["apple", "苹果"],
+  TSLA: ["tesla", "特斯拉"],
+  NVDA: ["nvidia", "英伟达", "nv"],
+  MSFT: ["microsoft", "微软"],
+  AMZN: ["amazon", "亚马逊"],
+  GOOGL: ["alphabet", "google", "谷歌"],
+  META: ["meta", "facebook", "脸书"],
+  BABA: ["alibaba", "阿里巴巴", "阿里"],
 };
 
 type BinanceKind = "fapi" | "spot";
@@ -312,8 +332,7 @@ export async function fetchStockQuote(tickerOrSymbol: string): Promise<Ticker> {
 }
 
 export async function searchCrypto(query: string): Promise<SearchResult[]> {
-  const q = query.trim().toUpperCase();
-  if (!q) return [];
+  if (!normalizeOrEmpty(query)) return [];
 
   const { data } = await binanceGet("/api/v3/exchangeInfo", { revalidate: 3600 });
   const payload = data as {
@@ -324,40 +343,61 @@ export async function searchCrypto(query: string): Promise<SearchResult[]> {
     .filter((item) => {
       const active = !item.status || item.status === "TRADING";
       const quote = item.quoteAsset ?? (item.symbol.endsWith("USDT") ? "USDT" : "");
-      return (
-        active &&
-        quote === "USDT" &&
-        isCryptoUsdtSymbol(item.symbol) &&
-        (item.symbol.includes(q) || (item.baseAsset ?? "").includes(q))
+      if (!(active && quote === "USDT" && isCryptoUsdtSymbol(item.symbol))) return false;
+      const name = CRYPTO_NAMES[item.symbol] ?? item.baseAsset ?? item.symbol.replace(/USDT$/, "");
+      const aliases = CRYPTO_ALIASES[item.symbol] ?? [];
+      return fuzzyMatchAny(
+        [item.symbol, item.baseAsset, name, ...aliases],
+        query,
       );
     })
+    .map((item) => {
+      const name = CRYPTO_NAMES[item.symbol] ?? item.baseAsset ?? item.symbol.replace(/USDT$/, "");
+      const aliases = CRYPTO_ALIASES[item.symbol] ?? [];
+      return {
+        symbol: item.symbol,
+        name,
+        market: "crypto" as const,
+        exchange: "Binance",
+        type: "CRYPTO",
+        _score: matchScore([item.symbol, item.baseAsset, name, ...aliases], query),
+      };
+    })
+    .sort((a, b) => b._score - a._score)
     .slice(0, 20)
-    .map((item) => ({
-      symbol: item.symbol,
-      name: CRYPTO_NAMES[item.symbol] ?? item.baseAsset ?? item.symbol.replace(/USDT$/, ""),
-      market: "crypto" as const,
-      exchange: "Binance",
-      type: "CRYPTO",
-    }));
+    .map(({ _score: _, ...item }) => item);
 }
 
 export async function searchStocks(query: string): Promise<SearchResult[]> {
-  const q = query.trim().toUpperCase();
-  if (!q) return [];
+  if (!normalizeOrEmpty(query)) return [];
 
-  return STOCK_INSTRUMENTS.filter(
-    (item) =>
-      item.ticker.includes(q) ||
-      item.name.toUpperCase().includes(q) ||
-      item.perpSymbol.includes(q) ||
-      item.spotSymbol.includes(q),
-  )
+  return STOCK_INSTRUMENTS.map((item) => {
+    const aliases = STOCK_ALIASES[item.ticker] ?? [];
+    const fields = [
+      item.ticker,
+      item.name,
+      item.perpSymbol,
+      item.spotSymbol,
+      ...aliases,
+    ];
+    return {
+      item,
+      score: matchScore(fields, query),
+      matched: fuzzyMatchAny(fields, query),
+    };
+  })
+    .filter((row) => row.matched)
+    .sort((a, b) => b.score - a.score)
     .slice(0, 20)
-    .map((item) => ({
+    .map(({ item }) => ({
       symbol: item.ticker,
       name: item.name,
       market: "stock" as const,
       exchange: "Binance TradFi",
       type: "STOCK",
     }));
+}
+
+function normalizeOrEmpty(query: string) {
+  return query.trim().toLowerCase().replace(/\s+/g, "");
 }

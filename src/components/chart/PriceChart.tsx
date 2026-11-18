@@ -169,5 +169,5 @@ export function PriceChart({
     chartRef.current?.timeScale().fitContent();
   }, [candles, indicators]);
 
-  return <div ref={containerRef} className="h-full w-full min-h-[420px]" />;
+  return <div ref={containerRef} className="h-full w-full min-h-[52vh] sm:min-h-[420px]" />;
 }

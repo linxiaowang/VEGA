@@ -29,17 +29,30 @@
 
 html {
   color-scheme: dark;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
   background:
     radial-gradient(1200px 600px at 10% -10%, rgba(46, 230, 166, 0.08), transparent 55%),
     radial-gradient(900px 500px at 90% 0%, rgba(91, 140, 255, 0.08), transparent 50%),
     linear-gradient(180deg, #0a1017 0%, var(--bg) 42%, #06080c 100%);
   color: var(--text);
   font-family: var(--font-display), system-ui, sans-serif;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+button,
+a,
+input {
+  -webkit-tap-highlight-color: transparent;
 }
 
 body::before {
@@ -52,7 +65,9 @@ body::before {
   z-index: 0;
 }
 
-body > * {
+/* 只抬主内容层级，避免污染 portal 弹层的 position:fixed */
+body > header,
+body > main {
   position: relative;
   z-index: 1;
 }
