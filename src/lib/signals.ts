@@ -334,7 +334,7 @@ function clusterLevels(
  * - 趋势：EMA20/50 排列 + EMA20 斜率（按 ATR 归一）+ DI 方向 + 摆动结构，
  *   ADX 不足 20 时判定为震荡
  * - Short：局部高点 + 冲高回落/阴线，且趋势分数偏多后转弱
- * - Strong Bounce：局部低点 + 放量阳线/长下影，且趋势分数偏空后企稳
+ * - Bounce（strong_bounce）：局部低点 + 放量阳线/长下影，且趋势分数偏空后企稳，
  * 支撑/阻力：近端摆动高低点聚类
  */
 export function analyzeSignals(
@@ -396,8 +396,8 @@ export function analyzeSignals(
           kind: "strong_bounce",
           time: candle.time,
           price: candle.low,
-          label: "Strong Bounce",
-          note: "低位放量/长下影止跌，短线或有反弹，回踩支撑需观察是否守住。",
+          label: "Bounce",
+          note: "低位止跌迹象，胜率接近随机，仅作观察提示，守住近端支撑才算成立。",
         });
       }
     }

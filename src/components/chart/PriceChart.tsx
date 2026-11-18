@@ -84,9 +84,9 @@ function toMarkers(analysis: SignalAnalysis | null): SeriesMarker<UTCTimestamp>[
     return {
       time: signal.time as UTCTimestamp,
       position: "belowBar",
-      shape: "arrowUp",
+      shape: "circle",
       color: "#2EE6A6",
-      text: "Strong Bounce",
+      text: "Bounce",
     };
   });
 }
