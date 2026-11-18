@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { subscribeBinanceLive } from "@/lib/binance-ws";
 import type { Candle, MarketKind, Quote, Ticker, Timeframe } from "@/lib/types";
 import { cn, formatCompact, formatPercent, formatPrice, formatSigned } from "@/lib/format";
 
@@ -30,6 +31,7 @@ export function ChartWorkspace({
 }) {
   const [timeframe, setTimeframe] = useState<Timeframe>("1h");
   const [candles, setCandles] = useState<Candle[]>([]);
+  const [dataVersion, setDataVersion] = useState(0);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [watchlist, setWatchlist] = useState<Ticker[]>([]);
   const [indicators, setIndicators] = useState<IndicatorKey[]>([
@@ -38,6 +40,9 @@ export function ChartWorkspace({
   ]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [liveStatus, setLiveStatus] = useState<
+    "connecting" | "live" | "reconnecting" | "error" | "idle"
+  >("idle");
 
   useEffect(() => {
     let cancelled = false;
@@ -62,7 +67,7 @@ export function ChartWorkspace({
     }
 
     loadQuoteAndList();
-    const timer = window.setInterval(loadQuoteAndList, 20000);
+    const timer = window.setInterval(loadQuoteAndList, 30000);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
@@ -74,6 +79,7 @@ export function ChartWorkspace({
 
     async function loadCandles() {
       setLoading(true);
+      setLiveStatus("idle");
       try {
         const res = await fetch(
           `/api/klines?market=${market}&symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`,
@@ -82,6 +88,7 @@ export function ChartWorkspace({
         if (!res.ok) throw new Error(data.error ?? "K线加载失败");
         if (cancelled) return;
         setCandles(data.candles ?? []);
+        setDataVersion((version) => version + 1);
         setError(null);
       } catch (err) {
         if (!cancelled) {
@@ -98,6 +105,47 @@ export function ChartWorkspace({
       cancelled = true;
     };
   }, [market, symbol, timeframe]);
+
+  // 币安 WebSocket：实时刷新当前 K 线 + 最新价
+  useEffect(() => {
+    if (loading) return;
+
+    const unsubscribe = subscribeBinanceLive({
+      market,
+      symbol,
+      timeframe,
+      onStatus: setLiveStatus,
+      onTicker: (price) => {
+        setQuote((prev) => {
+          if (!prev) return prev;
+          const previousClose = prev.previousClose ?? prev.price;
+          const change = price - previousClose;
+          const changePercent = previousClose ? (change / previousClose) * 100 : 0;
+          return { ...prev, price, change, changePercent };
+        });
+        setWatchlist((prev) =>
+          prev.map((item) => {
+            if (item.symbol !== symbol) return item;
+            const previousClose = item.previousClose ?? item.price - item.change;
+            const change = price - previousClose;
+            const changePercent = previousClose ? (change / previousClose) * 100 : 0;
+            return { ...item, price, change, changePercent };
+          }),
+        );
+      },
+      onKline: ({ candle }) => {
+        setCandles((prev) => {
+          if (!prev.length) return [candle];
+          const last = prev[prev.length - 1];
+          if (candle.time > last.time) return [...prev, candle];
+          if (candle.time === last.time) return [...prev.slice(0, -1), candle];
+          return prev;
+        });
+      },
+    });
+
+    return unsubscribe;
+  }, [market, symbol, timeframe, loading]);
 
   const up = (quote?.changePercent ?? 0) >= 0;
 
@@ -214,6 +262,7 @@ export function ChartWorkspace({
               >
                 {market}
               </span>
+              <LiveBadge status={liveStatus} />
             </div>
             <p className="mt-1 truncate text-sm text-[var(--muted)]">{quote?.name ?? "—"}</p>
           </div>
@@ -281,7 +330,11 @@ export function ChartWorkspace({
           {loading && !candles.length ? (
             <ChartSkeleton />
           ) : (
-            <PriceChart candles={candles} indicators={indicators} />
+            <PriceChart
+              candles={candles}
+              indicators={indicators}
+              dataVersion={dataVersion}
+            />
           )}
         </div>
       </section>
@@ -309,11 +362,53 @@ export function ChartWorkspace({
             {market === "crypto"
               ? "（USDT 永续/现货）"
               : "（美股 TradFi 永续优先，回退代币化股票 *BUSDT）"}
-            。图表基于 TradingView Lightweight Charts。
+            。K 线通过 WebSocket 实时推送。图表基于 TradingView Lightweight Charts。
           </div>
         </div>
       </aside>
     </div>
+  );
+}
+
+function LiveBadge({
+  status,
+}: {
+  status: "connecting" | "live" | "reconnecting" | "error" | "idle";
+}) {
+  const label =
+    status === "live"
+      ? "LIVE"
+      : status === "connecting"
+        ? "连接中"
+        : status === "reconnecting"
+          ? "重连中"
+          : status === "error"
+            ? "断线"
+            : "待机";
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 font-[family-name:var(--font-mono)] text-[10px] uppercase tracking-wide",
+        status === "live"
+          ? "bg-[color-mix(in_oklab,var(--accent)_16%,transparent)] text-[var(--accent)]"
+          : status === "error"
+            ? "bg-[color-mix(in_oklab,var(--down)_16%,transparent)] text-[var(--down)]"
+            : "bg-[var(--panel-2)] text-[var(--muted)]",
+      )}
+    >
+      <span
+        className={cn(
+          "h-1.5 w-1.5 rounded-full",
+          status === "live"
+            ? "animate-pulse bg-[var(--accent)]"
+            : status === "error"
+              ? "bg-[var(--down)]"
+              : "bg-[var(--muted)]",
+        )}
+      />
+      {label}
+    </span>
   );
 }
 

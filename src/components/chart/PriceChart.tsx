@@ -17,12 +17,59 @@ import { ema, sma } from "@/lib/indicators";
 
 type IndicatorKey = "ma20" | "ma50" | "ema12" | "volume";
 
+function applyIndicators(
+  candles: Candle[],
+  indicators: IndicatorKey[],
+  refs: {
+    volume: ISeriesApi<"Histogram"> | null;
+    ma20: ISeriesApi<"Line"> | null;
+    ma50: ISeriesApi<"Line"> | null;
+    ema12: ISeriesApi<"Line"> | null;
+  },
+) {
+  if (indicators.includes("volume") && refs.volume) {
+    refs.volume.setData(
+      candles.map((c) => ({
+        time: c.time as UTCTimestamp,
+        value: c.volume,
+        color:
+          c.close >= c.open
+            ? "rgba(46, 230, 166, 0.45)"
+            : "rgba(255, 77, 109, 0.45)",
+      })),
+    );
+  } else {
+    refs.volume?.setData([]);
+  }
+
+  if (indicators.includes("ma20") && refs.ma20) {
+    refs.ma20.setData(sma(candles, 20) as never);
+  } else {
+    refs.ma20?.setData([]);
+  }
+
+  if (indicators.includes("ma50") && refs.ma50) {
+    refs.ma50.setData(sma(candles, 50) as never);
+  } else {
+    refs.ma50?.setData([]);
+  }
+
+  if (indicators.includes("ema12") && refs.ema12) {
+    refs.ema12.setData(ema(candles, 12) as never);
+  } else {
+    refs.ema12?.setData([]);
+  }
+}
+
 export function PriceChart({
   candles,
   indicators,
+  dataVersion,
 }: {
   candles: Candle[];
   indicators: IndicatorKey[];
+  /** REST 全量刷新时递增；实时 tick 不递增，走 update */
+  dataVersion: number;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -31,6 +78,8 @@ export function PriceChart({
   const ma20Ref = useRef<ISeriesApi<"Line"> | null>(null);
   const ma50Ref = useRef<ISeriesApi<"Line"> | null>(null);
   const ema12Ref = useRef<ISeriesApi<"Line"> | null>(null);
+  const lastVersionRef = useRef<number>(-1);
+  const lastLiveTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -71,7 +120,6 @@ export function PriceChart({
       wickDownColor: "#FF4D6D",
     });
 
-    // v5：成交量放独立 pane，不要自定义 priceScaleId
     const volumeSeries = chart.addSeries(
       HistogramSeries,
       {
@@ -120,54 +168,55 @@ export function PriceChart({
     };
   }, []);
 
+  // REST 全量数据
   useEffect(() => {
-    if (!candleSeriesRef.current || !volumeSeriesRef.current) return;
+    if (!candleSeriesRef.current || dataVersion === lastVersionRef.current) return;
+    lastVersionRef.current = dataVersion;
+    lastLiveTimeRef.current = candles.at(-1)?.time ?? null;
 
-    const candleData = candles.map((c) => ({
-      time: c.time as UTCTimestamp,
-      open: c.open,
-      high: c.high,
-      low: c.low,
-      close: c.close,
-    }));
+    candleSeriesRef.current.setData(
+      candles.map((c) => ({
+        time: c.time as UTCTimestamp,
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+      })),
+    );
 
-    candleSeriesRef.current.setData(candleData);
-
-    if (indicators.includes("volume")) {
-      volumeSeriesRef.current.setData(
-        candles.map((c) => ({
-          time: c.time as UTCTimestamp,
-          value: c.volume,
-          color:
-            c.close >= c.open
-              ? "rgba(46, 230, 166, 0.45)"
-              : "rgba(255, 77, 109, 0.45)",
-        })),
-      );
-    } else {
-      volumeSeriesRef.current.setData([]);
-    }
-
-    if (indicators.includes("ma20") && ma20Ref.current) {
-      ma20Ref.current.setData(sma(candles, 20) as never);
-    } else {
-      ma20Ref.current?.setData([]);
-    }
-
-    if (indicators.includes("ma50") && ma50Ref.current) {
-      ma50Ref.current.setData(sma(candles, 50) as never);
-    } else {
-      ma50Ref.current?.setData([]);
-    }
-
-    if (indicators.includes("ema12") && ema12Ref.current) {
-      ema12Ref.current.setData(ema(candles, 12) as never);
-    } else {
-      ema12Ref.current?.setData([]);
-    }
+    applyIndicators(candles, indicators, {
+      volume: volumeSeriesRef.current,
+      ma20: ma20Ref.current,
+      ma50: ma50Ref.current,
+      ema12: ema12Ref.current,
+    });
 
     chartRef.current?.timeScale().fitContent();
-  }, [candles, indicators]);
+  }, [candles, dataVersion, indicators]);
+
+  // 实时最后一根 / 指标开关变化时的增量刷新
+  useEffect(() => {
+    if (!candleSeriesRef.current || !candles.length) return;
+    if (dataVersion !== lastVersionRef.current) return;
+
+    const last = candles[candles.length - 1];
+    candleSeriesRef.current.update({
+      time: last.time as UTCTimestamp,
+      open: last.open,
+      high: last.high,
+      low: last.low,
+      close: last.close,
+    });
+
+    applyIndicators(candles, indicators, {
+      volume: volumeSeriesRef.current,
+      ma20: ma20Ref.current,
+      ma50: ma50Ref.current,
+      ema12: ema12Ref.current,
+    });
+
+    lastLiveTimeRef.current = last.time;
+  }, [candles, dataVersion, indicators]);
 
   return <div ref={containerRef} className="h-full w-full min-h-[52vh] sm:min-h-[420px]" />;
 }
