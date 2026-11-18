@@ -1,36 +1,32 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# VEGA
 
-## Getting Started
+参考 TradingView 的股票 / 加密货币行情站：
 
-First, run the development server:
+- 首页行情榜（加密货币 + 美股切换）
+- 专业图表终端（K 线、周期、MA/EMA、成交量、Watchlist）
+- 真实数据：全部来自币安公开 API
+  - 加密：USDT 交易对
+  - 美股：TradFi 永续（如 `AAPLUSDT`，优先 `fapi.binance.com`），失败则回退现货代币化股票（如 `AAPLBUSDT`）
+
+## 启动
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+打开 [http://localhost:3000](http://localhost:3000)。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 主要路由
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| 路径 | 说明 |
+| --- | --- |
+| `/` | 行情首页 |
+| `/chart/crypto/BTCUSDT` | 加密货币图表 |
+| `/chart/stock/AAPL` | 美股图表（内部映射币安合约/代币化股票） |
 
-## Learn More
+## 技术栈
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Next.js App Router + TypeScript + Tailwind CSS
+- TradingView [Lightweight Charts](https://github.com/tradingview/lightweight-charts) v5
+- 服务端 API 代理：优先 `fapi.binance.com`，回退 `data-api.binance.vision` / `api.binance.com`
