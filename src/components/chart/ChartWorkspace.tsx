@@ -151,7 +151,10 @@ export function ChartWorkspace({
 
   const up = (quote?.changePercent ?? 0) >= 0;
 
-  const analysis = useMemo(() => analyzeSignals(candles), [candles]);
+  const analysis = useMemo(
+    () => analyzeSignals(candles, timeframe),
+    [candles, timeframe],
+  );
 
   const stats = useMemo(
     () => [

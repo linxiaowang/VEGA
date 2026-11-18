@@ -36,10 +36,11 @@ export function SearchDialog() {
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const id = window.setTimeout(() => inputRef.current?.focus(), 20);
+    inputRef.current?.focus();
+    const raf = window.requestAnimationFrame(() => inputRef.current?.focus());
     return () => {
       document.body.style.overflow = prev;
-      window.clearTimeout(id);
+      window.cancelAnimationFrame(raf);
     };
   }, [open]);
 
@@ -104,6 +105,7 @@ export function SearchDialog() {
                 <SearchIcon />
                 <input
                   ref={inputRef}
+                  autoFocus
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="代码或名称，如 btc / AAPL"

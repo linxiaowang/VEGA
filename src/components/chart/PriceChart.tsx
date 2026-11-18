@@ -22,6 +22,9 @@ import type { SignalAnalysis } from "@/lib/signals";
 
 type IndicatorKey = "ma20" | "ma50" | "ema12" | "volume";
 
+const VISIBLE_CANDLES = 120;
+const MAX_SIGNAL_MARKERS = 3;
+
 function applyIndicators(
   candles: Candle[],
   indicators: IndicatorKey[],
@@ -68,7 +71,7 @@ function applyIndicators(
 
 function toMarkers(analysis: SignalAnalysis | null): SeriesMarker<UTCTimestamp>[] {
   if (!analysis) return [];
-  return analysis.signals.map((signal) => {
+  return analysis.signals.slice(-MAX_SIGNAL_MARKERS).map((signal) => {
     if (signal.kind === "short") {
       return {
         time: signal.time as UTCTimestamp,
@@ -230,7 +233,11 @@ export function PriceChart({
       ema12: ema12Ref.current,
     });
 
-    chartRef.current?.timeScale().fitContent();
+    const timeScale = chartRef.current?.timeScale();
+    if (timeScale) {
+      const from = Math.max(0, candles.length - VISIBLE_CANDLES);
+      timeScale.setVisibleLogicalRange({ from, to: candles.length - 1 });
+    }
   }, [candles, dataVersion, indicators]);
 
   useEffect(() => {

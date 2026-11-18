@@ -55,6 +55,7 @@ const CRYPTO_NAMES: Record<string, string> = {
   DOTUSDT: "Polkadot",
   LTCUSDT: "Litecoin",
   ATOMUSDT: "Cosmos",
+  AKTUSDT: "Akash Network",
 };
 
 const CRYPTO_ALIASES: Record<string, string[]> = {
@@ -63,6 +64,7 @@ const CRYPTO_ALIASES: Record<string, string[]> = {
   BNBUSDT: ["bnb", "币安币"],
   SOLUSDT: ["solana", "sol", "索拉纳"],
   DOGEUSDT: ["dogecoin", "doge", "狗狗币"],
+  AKTUSDT: ["akash", "akash network", "阿卡什"],
 };
 
 const STOCK_ALIASES: Record<string, string[]> = {
@@ -112,13 +114,14 @@ function orderBases(options?: { prefer?: BinanceKind; kindOnly?: BinanceKind }):
     if (item && pool.includes(item) && !ordered.includes(item)) ordered.push(item);
   };
 
-  // 已探活且类型匹配的节点优先
-  pushUnique(cachedBase);
+  // 指定 prefer 时先排该类型节点，避免缓存命中的另一类型先返回不完整列表
   if (options?.prefer) {
     for (const item of pool) {
       if (item.kind === options.prefer) pushUnique(item);
     }
   }
+  // 已探活且类型匹配的节点优先
+  pushUnique(cachedBase);
   for (const item of pool) pushUnique(item);
   return ordered;
 }
@@ -211,7 +214,7 @@ function isCryptoUsdtSymbol(symbol: string) {
 }
 
 export async function fetchCryptoTickers(): Promise<Ticker[]> {
-  const { data } = await binanceGet("/api/v3/ticker/24hr");
+  const { data } = await binanceGet("/api/v3/ticker/24hr", { prefer: "fapi" });
   const rows = data as Array<Record<string, string>>;
 
   const usdt = rows
@@ -271,7 +274,7 @@ export async function fetchCryptoKlines(
 ): Promise<Candle[]> {
   const interval = INTERVAL_MAP[timeframe];
   const path = `/api/v3/klines?symbol=${encodeURIComponent(symbol.toUpperCase())}&interval=${interval}&limit=${limit}`;
-  const { data } = await binanceGet(path);
+  const { data } = await binanceGet(path, { prefer: "fapi" });
   return mapKlines(data as Array<Array<string | number>>);
 }
 
@@ -299,6 +302,7 @@ export async function fetchStockKlines(
 export async function fetchCryptoQuote(symbol: string): Promise<Ticker> {
   const { data } = await binanceGet(
     `/api/v3/ticker/24hr?symbol=${encodeURIComponent(symbol.toUpperCase())}`,
+    { prefer: "fapi" },
   );
   const row = data as Record<string, string>;
   return mapRowToTicker(
@@ -334,7 +338,10 @@ export async function fetchStockQuote(tickerOrSymbol: string): Promise<Ticker> {
 export async function searchCrypto(query: string): Promise<SearchResult[]> {
   if (!normalizeOrEmpty(query)) return [];
 
-  const { data } = await binanceGet("/api/v3/exchangeInfo", { revalidate: 3600 });
+  const { data } = await binanceGet("/api/v3/exchangeInfo", {
+    prefer: "fapi",
+    revalidate: 3600,
+  });
   const payload = data as {
     symbols: Array<{ symbol: string; baseAsset?: string; quoteAsset?: string; status?: string }>;
   };
