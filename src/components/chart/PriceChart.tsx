@@ -8,12 +8,17 @@ import {
   HistogramSeries,
   LineSeries,
   createChart,
+  createSeriesMarkers,
   type IChartApi,
+  type IPriceLine,
   type ISeriesApi,
+  type ISeriesMarkersPluginApi,
+  type SeriesMarker,
   type UTCTimestamp,
 } from "lightweight-charts";
 import type { Candle } from "@/lib/types";
 import { ema, sma } from "@/lib/indicators";
+import type { SignalAnalysis } from "@/lib/signals";
 
 type IndicatorKey = "ma20" | "ma50" | "ema12" | "volume";
 
@@ -61,15 +66,40 @@ function applyIndicators(
   }
 }
 
+function toMarkers(analysis: SignalAnalysis | null): SeriesMarker<UTCTimestamp>[] {
+  if (!analysis) return [];
+  return analysis.signals.map((signal) => {
+    if (signal.kind === "short") {
+      return {
+        time: signal.time as UTCTimestamp,
+        position: "aboveBar",
+        shape: "arrowDown",
+        color: "#FF4D6D",
+        text: "Short",
+      };
+    }
+    return {
+      time: signal.time as UTCTimestamp,
+      position: "belowBar",
+      shape: "arrowUp",
+      color: "#2EE6A6",
+      text: "Strong Bounce",
+    };
+  });
+}
+
 export function PriceChart({
   candles,
   indicators,
   dataVersion,
+  analysis,
+  showSignals,
 }: {
   candles: Candle[];
   indicators: IndicatorKey[];
-  /** REST 全量刷新时递增；实时 tick 不递增，走 update */
   dataVersion: number;
+  analysis: SignalAnalysis | null;
+  showSignals: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -78,8 +108,9 @@ export function PriceChart({
   const ma20Ref = useRef<ISeriesApi<"Line"> | null>(null);
   const ma50Ref = useRef<ISeriesApi<"Line"> | null>(null);
   const ema12Ref = useRef<ISeriesApi<"Line"> | null>(null);
+  const markersRef = useRef<ISeriesMarkersPluginApi<UTCTimestamp> | null>(null);
+  const levelLinesRef = useRef<IPriceLine[]>([]);
   const lastVersionRef = useRef<number>(-1);
-  const lastLiveTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -150,6 +181,11 @@ export function PriceChart({
       lastValueVisible: false,
     });
 
+    markersRef.current = createSeriesMarkers<UTCTimestamp>(
+      candlesSeries as ISeriesApi<"Candlestick", UTCTimestamp>,
+      [],
+    );
+
     chartRef.current = chart;
     candleSeriesRef.current = candlesSeries;
     volumeSeriesRef.current = volumeSeries;
@@ -158,6 +194,10 @@ export function PriceChart({
     ema12Ref.current = ema12;
 
     return () => {
+      for (const line of levelLinesRef.current) {
+        candlesSeries.removePriceLine(line);
+      }
+      levelLinesRef.current = [];
       chart.remove();
       chartRef.current = null;
       candleSeriesRef.current = null;
@@ -165,14 +205,13 @@ export function PriceChart({
       ma20Ref.current = null;
       ma50Ref.current = null;
       ema12Ref.current = null;
+      markersRef.current = null;
     };
   }, []);
 
-  // REST 全量数据
   useEffect(() => {
     if (!candleSeriesRef.current || dataVersion === lastVersionRef.current) return;
     lastVersionRef.current = dataVersion;
-    lastLiveTimeRef.current = candles.at(-1)?.time ?? null;
 
     candleSeriesRef.current.setData(
       candles.map((c) => ({
@@ -194,7 +233,6 @@ export function PriceChart({
     chartRef.current?.timeScale().fitContent();
   }, [candles, dataVersion, indicators]);
 
-  // 实时最后一根 / 指标开关变化时的增量刷新
   useEffect(() => {
     if (!candleSeriesRef.current || !candles.length) return;
     if (dataVersion !== lastVersionRef.current) return;
@@ -214,9 +252,38 @@ export function PriceChart({
       ma50: ma50Ref.current,
       ema12: ema12Ref.current,
     });
-
-    lastLiveTimeRef.current = last.time;
   }, [candles, dataVersion, indicators]);
 
-  return <div ref={containerRef} className="h-full w-full min-h-[52vh] sm:min-h-[420px]" />;
+  // 信号标记 + 支撑阻力线
+  useEffect(() => {
+    const series = candleSeriesRef.current;
+    if (!series || !markersRef.current) return;
+
+    markersRef.current.setMarkers(showSignals ? toMarkers(analysis) : []);
+
+    for (const line of levelLinesRef.current) {
+      series.removePriceLine(line);
+    }
+    levelLinesRef.current = [];
+
+    if (!showSignals || !analysis) return;
+
+    levelLinesRef.current = analysis.levels.map((level) =>
+      series.createPriceLine({
+        price: level.price,
+        color: level.kind === "support" ? "rgba(46, 230, 166, 0.85)" : "rgba(255, 77, 109, 0.85)",
+        lineWidth: 1,
+        lineStyle: 2,
+        axisLabelVisible: true,
+        title: level.kind === "support" ? "支撑" : "阻力",
+      }),
+    );
+  }, [analysis, showSignals, dataVersion, candles.length]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="h-full w-full min-h-[52vh] touch-none sm:min-h-[420px]"
+    />
+  );
 }

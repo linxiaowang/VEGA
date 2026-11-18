@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { subscribeBinanceLive } from "@/lib/binance-ws";
+import { analyzeSignals } from "@/lib/signals";
 import type { Candle, MarketKind, Quote, Ticker, Timeframe } from "@/lib/types";
 import { cn, formatCompact, formatPercent, formatPrice, formatSigned } from "@/lib/format";
 
@@ -38,6 +39,7 @@ export function ChartWorkspace({
     "ma20",
     "volume",
   ]);
+  const [showSignals, setShowSignals] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [liveStatus, setLiveStatus] = useState<
@@ -148,6 +150,8 @@ export function ChartWorkspace({
   }, [market, symbol, timeframe, loading]);
 
   const up = (quote?.changePercent ?? 0) >= 0;
+
+  const analysis = useMemo(() => analyzeSignals(candles), [candles]);
 
   const stats = useMemo(
     () => [
@@ -318,6 +322,18 @@ export function ChartWorkspace({
                 </button>
               );
             })}
+            <button
+              type="button"
+              onClick={() => setShowSignals((prev) => !prev)}
+              className={cn(
+                "shrink-0 rounded-md border px-3 py-1.5 text-xs transition sm:px-2.5 sm:py-1",
+                showSignals
+                  ? "border-[var(--accent)] text-[var(--accent)]"
+                  : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)]",
+              )}
+            >
+              技术信号
+            </button>
           </div>
         </div>
 
@@ -334,6 +350,8 @@ export function ChartWorkspace({
               candles={candles}
               indicators={indicators}
               dataVersion={dataVersion}
+              analysis={analysis}
+              showSignals={showSignals}
             />
           )}
         </div>
@@ -357,6 +375,76 @@ export function ChartWorkspace({
               </span>
             </div>
           ))}
+
+          <div className="col-span-2 space-y-2 rounded-xl border border-[var(--border)] bg-[var(--panel-2)]/50 p-3 sm:col-span-1">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]">
+                走势解读
+              </p>
+              <span
+                className={cn(
+                  "rounded-md px-2 py-0.5 font-[family-name:var(--font-mono)] text-[10px] uppercase",
+                  analysis.bias === "bullish"
+                    ? "bg-[color-mix(in_oklab,var(--up)_16%,transparent)] text-[var(--up)]"
+                    : analysis.bias === "bearish"
+                      ? "bg-[color-mix(in_oklab,var(--down)_16%,transparent)] text-[var(--down)]"
+                      : "bg-[var(--bg)] text-[var(--muted)]",
+                )}
+              >
+                {analysis.bias === "bullish"
+                  ? "偏多"
+                  : analysis.bias === "bearish"
+                    ? "偏空"
+                    : "中性"}
+              </span>
+            </div>
+            <p className="text-[11px] leading-relaxed text-[var(--text)] sm:text-xs">
+              {analysis.summary}
+            </p>
+            {analysis.levels.length > 0 && (
+              <div className="space-y-1.5 border-t border-[var(--border)] pt-2">
+                {analysis.levels.map((level) => (
+                  <div
+                    key={`${level.kind}-${level.price}`}
+                    className="flex items-center justify-between gap-2 text-[11px]"
+                  >
+                    <span
+                      className={cn(
+                        level.kind === "support" ? "text-[var(--up)]" : "text-[var(--down)]",
+                      )}
+                    >
+                      {level.kind === "support" ? "支撑" : "阻力"}
+                    </span>
+                    <span className="font-[family-name:var(--font-mono)] tabular-nums text-[var(--text)]">
+                      {formatPrice(level.price, market)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {analysis.signals.length > 0 && (
+              <div className="space-y-1.5 border-t border-[var(--border)] pt-2">
+                <p className="text-[10px] uppercase tracking-wide text-[var(--muted)]">最近信号</p>
+                {analysis.signals.slice(-3).reverse().map((signal) => (
+                  <div key={`${signal.kind}-${signal.time}`} className="text-[11px]">
+                    <span
+                      className={cn(
+                        "font-[family-name:var(--font-mono)]",
+                        signal.kind === "short" ? "text-[var(--down)]" : "text-[var(--up)]",
+                      )}
+                    >
+                      {signal.label}
+                    </span>
+                    <span className="ml-1.5 text-[var(--muted)]">{signal.note}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="border-t border-[var(--border)] pt-2 text-[10px] leading-relaxed text-[var(--muted)]">
+              教学向规则信号，非投资建议。关注：站稳阻力→趋势延续；跌破支撑→警惕下探。
+            </p>
+          </div>
+
           <div className="col-span-2 rounded-xl border border-[var(--border)] bg-[var(--bg)] p-3 text-[11px] leading-relaxed text-[var(--muted)] sm:col-span-1 sm:text-xs">
             数据来源：币安公开行情
             {market === "crypto"
